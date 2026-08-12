@@ -19,18 +19,41 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 #        ▼
 # LangChain StructuredTool objects
 
+# Resolve virtualenv Python path dynamically (bin/python on Mac/Linux, Scripts/python.exe on Windows)
+venv_python = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "aviationstack-mcp",
+        ".venv",
+        "Scripts" if os.name == "nt" else "bin",
+        "python.exe" if os.name == "nt" else "python"
+    )
+)
 
-# Create the MCP client for Tavily
+# Create the MCP client for Tavily and AviationStack
 client = MultiServerMCPClient(
     {
         "tavily":{
             "transport": "streamable_http", #tells the MCP client how it should communicate with the MCP server.
             "url": f"https://mcp.tavily.com/mcp/?tavilyApiKey={TAVILY_API_KEY}"
+        },
+         "aviationstack": {
+            "transport": "stdio",
+            "command": venv_python,
+            "args": [
+                "-m",
+                "aviationstack_mcp",
+                "mcp",
+                "run"
+            ],
+            "env": {
+                "AVIATION_STACK_API_KEY": AVIATION_STACK_API_KEY
+            }
         }
     }
 )
 
-# tool calling from langhchain to tavily using mcp_server
+# tool calling  | testing mcp server
 async def main():
     # getting all tools from tavily
     tools = await client.get_tools()
@@ -53,7 +76,6 @@ async def main():
     })
     print("\nResult:", result)
 
-
 if __name__ == "__main__":
     asyncio.run(main())
 
@@ -74,6 +96,7 @@ async def initialize_mcp():
     for tool in tools:
         print(tool.name)
 
+# find the tavily_search tool from list of tools and break 
     search_tool = next(
         tool
         for tool in tools
@@ -88,4 +111,4 @@ async def tavily_mcp_server(query:str):
         "query":query
     })
     return result
-    
+

@@ -5,7 +5,7 @@ import asyncio
 
 import psycopg
 from langgraph.graph import StateGraph, START, END
-# from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langchain_core.messages import (
     AnyMessage,
     HumanMessage,
@@ -61,7 +61,8 @@ def flight_agent(state: TravelState):
 def hotel_agent(state: TravelState):
     query = f"Best hotels for {state['user_query']}"
     # hotel_results = tavily_search(query)
-
+    
+    # using from mcp
     hotel_results = asyncio.run(tavily_mcp_server(query))
 
     #update TravelState with below details
@@ -168,7 +169,7 @@ print("Graph saved successfully!")
 if __name__ == "__main__":
     config = {
         "configurable": {
-            "thread_id": "mahesh-1"  # Required for resuming state
+            "thread_id": "mahesh-2"  # Required for resuming state
         }
     }
 
@@ -176,7 +177,7 @@ if __name__ == "__main__":
     # import uuid
     # config = {"configurable": {"thread_id": str(uuid.uuid4())}}
 
-    # user_input = input("Enter travel requests:")
+    user_input = input("Enter travel requests:")
     
     # Invoke the multi-agent graph with initial state and session config for Postgres checkpoint persistence
     result = app.invoke(
