@@ -4,7 +4,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 load_dotenv()
 
-AVIATION_STACK_API_KEY = os.getenv("AVIATIONSTACK_API_KEY")
+AVIATION_STACK_API_KEY = os.getenv("AVIATION_STACK_API_KEY")
 
 # Resolve virtualenv Python path dynamically (bin/python on Mac/Linux, Scripts/python.exe on Windows)
 venv_python = os.path.abspath(

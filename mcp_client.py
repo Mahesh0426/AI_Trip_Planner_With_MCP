@@ -8,16 +8,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 load_dotenv()
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-
-# Tavily MCP Server
-#        │
-#        │ "Here are my tools"
-#        ▼
-# MultiServerMCPClient
-#        │
-#        │ converts MCP → LangChain
-#        ▼
-# LangChain StructuredTool objects
+AVIATION_STACK_API_KEY = os.getenv("AVIATION_STACK_API_KEY")
 
 # Resolve virtualenv Python path dynamically (bin/python on Mac/Linux, Scripts/python.exe on Windows)
 venv_python = os.path.abspath(
@@ -53,15 +44,15 @@ client = MultiServerMCPClient(
     }
 )
 
-# tool calling  | testing mcp server
+# tool discovery  | testing mcp server
 async def main():
-    # getting all tools from tavily
+ 
     tools = await client.get_tools()
     
-    # print("\nAvailable MCP tools:\n", tools)
-        # for tool in tools:
-        #     print(tool.name)
-    #output - tavily_search, tavily_extract, tavily_crawl, tavily_map,tavily_research
+    print("\nAvailable MCP tools:\n")
+    for tool in tools:
+            print(tool.name)
+           
     
     # find the tavily_search tool from list of tools and break 
     search_tool = None
@@ -76,35 +67,46 @@ async def main():
     })
     print("\nResult:", result)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
 
 
 # initialize tavily mcp server only once
 search_tool = None
+aviation_tools={}
 
-# initialize_mcp function is used to initialize the tavily mcp server only once 
-# and get the tavily_search tool from the list of tools.
+# Initialize mcp for both tavily and aviationstack 
 async def initialize_mcp():
+    
     global search_tool
-    if search_tool is not None:
+    global aviation_tools
+    
+    if search_tool is not None and aviation_tools:
         return
 
     tools = await client.get_tools()
+
     print("\nAvailable MCP Tools:")
 
     for tool in tools:
         print(tool.name)
-
-# find the tavily_search tool from list of tools and break 
-    search_tool = next(
-        tool
+        
+    # find the tavily_search tool from list of tools and break 
+    search_tool = None
+    for tool in tools:
+        if tool.name == "tavily_search":
+            search_tool = tool
+            break
+        
+    # Get all the other tools of aviationstack using dict comprehension
+    aviation_tools = {
+        tool.name: tool
         for tool in tools
-        if tool.name == "tavily_search"
-    )
+        if tool.name != "tavily_search"
+    }
 
 
-#  function tavily_mcp_server -> using only this function we can call tavily mcp server
+# function tavily_mcp_server -> using only this function we can call tavily mcp server
 async def tavily_mcp_server(query:str):
     await initialize_mcp()
     result = await search_tool.ainvoke({
@@ -112,3 +114,40 @@ async def tavily_mcp_server(query:str):
     })
     return result
 
+# function for aviation mcp server 
+async def aviation_mcp_calls(tool_name: str, tool_args: dict = None):
+    tools = await client.get_tools()
+    
+    tool = next(
+        t for t in tools
+        if t.name == tool_name
+    )
+    
+    result = await tool.ainvoke(tool_args or {})
+    
+    return result
+
+
+# function to get list of airports from mcp tools
+async def get_airports():
+    await initialize_mcp()
+    
+    tool = aviation_tools.get("list_airpots")
+    
+    if not tool:
+        return "list_airpots tool not found"
+    
+    result = await tool.ainvoke({})
+    return result
+
+# function to get list of airlines from mcp tools
+async def get_airlines():
+    await initialize_mcp()
+    
+    tool = aviation_tools.get("list_airlines")
+    
+    if not tool:
+        return "list_airlines tool not found"
+    
+    result = await tool.ainvoke({})
+    return result

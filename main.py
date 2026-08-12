@@ -14,9 +14,14 @@ from langchain_core.messages import (
 )
 from langchain_groq import ChatGroq
 # from tools.tavily_tool import tavily_search
-from tools.flight_tool import search_flights
+# from tools.flight_tool import search_flights
 from dotenv import load_dotenv
-from mcp_client import tavily_mcp_server
+from mcp_client import (
+    tavily_mcp_server,
+    aviation_mcp_calls,
+    get_airports,
+    get_airlines,
+)
 
 load_dotenv()
 
@@ -33,6 +38,35 @@ llm = ChatGroq(
     model="llama-3.3-70b-versatile"
 )
 
+# flight tool router prompt
+FLIGHT_AGENT_PROMPT="""
+You are an expert travel flight planner.
+Use the available MCP tools to find the best flights for the user's query.
+
+User Query:
+{query}
+
+Available Airport Information:
+{airport_data}
+
+Available Airlines Information:
+{airline_data}
+
+Generates:
+
+1.Likely Departure airport
+2.Likely Arrival airport
+3.Airlines serving this route 
+4.Typical flight durations 
+5.Estimated airfare range 
+6.Peak Season Pricing Warning 
+7.Best Time To Book
+8.booking advice
+
+Return concise travel guidance. 
+"""
+
+
 #TravelState is the shared storage that every node in your LangGraph can read from and write to
 class TravelState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]  # List of messages; operator.add combines new messages with existing messages.
@@ -46,18 +80,38 @@ class TravelState(TypedDict):
 # Flight Agent
 def flight_agent(state: TravelState):
     query = state["user_query"]
-    flight_data = search_flights(query)
-    
-    #update TravelState with below details
-    return {
+    # flight_data = search_flights(query)
+
+    try:
+        airports_raw = asyncio.run(aviation_mcp_calls("list_airpots", {}))
+        airlines_raw = asyncio.run(aviation_mcp_calls("list_airlines", {}))
+        
+        prompt = FLIGHT_AGENT_PROMPT.format(
+            query=query,
+            airport_data=str(airports_raw)[:3000],
+            airline_data=str(airlines_raw)[:3000]
+        )
+        
+        response = llm.invoke([
+            SystemMessage(
+                content="You are an expert travel flight planner"
+            ),
+            HumanMessage(content=prompt)
+        ])
+        flight_data = response.content
+        
+    except Exception as e:
+        flight_data = f"Information on available:{str(e)} "
+        
+    return{
         "flight_results": flight_data,
         "messages": [
-            AIMessage(content=f"Flight results fetched")
+            AIMessage(content="Flight recommendations generated")
         ],
         "llm_calls": state.get("llm_calls", 0) + 1
     }
     
-    # Hotel Agent
+# Hotel Agent
 def hotel_agent(state: TravelState):
     query = f"Best hotels for {state['user_query']}"
     # hotel_results = tavily_search(query)
