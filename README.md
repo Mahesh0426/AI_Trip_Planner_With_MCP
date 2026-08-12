@@ -25,6 +25,10 @@ The project uses Model-Chain Protocol (MCP) concepts with tools like LangChain, 
    cd /path/to/AI-Trip-Planner-MCP
    ```
 
+# this is repo you need to clone for aviataionmcp
+
+https://github.com/Pradumnasaraf/aviationstack-mcp
+
 2. Create and activate a virtual environment:
 
    ```bash
