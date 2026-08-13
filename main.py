@@ -1,3 +1,4 @@
+from mcp_client import (forecast_mcp_search, weather_mcp_search, extract_destination)
 import os
 from typing import TypedDict, Annotated
 import operator
@@ -6,32 +7,17 @@ import asyncio
 import psycopg
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres import PostgresSaver
-from langchain_core.messages import (
-    AnyMessage,
-    HumanMessage,
-    AIMessage,
-    SystemMessage,
-)
+from langchain_core.messages import ( AnyMessage,HumanMessage,AIMessage,SystemMessage)
 from langchain_groq import ChatGroq
 # from tools.tavily_tool import tavily_search
 # from tools.flight_tool import search_flights
 from dotenv import load_dotenv
-from mcp_client import (
-    tavily_mcp_server,
-    aviation_mcp_calls,
-    get_airports,
-    get_airlines,
-)
+from mcp_client import (tavily_mcp_server,aviation_mcp_calls,get_airports, get_airlines, freezw)
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/trip_planner")
-
 # Note: Make sure your Docker container is running (`docker compose up -d`) before connecting.
-# Example PostgresSaver connection setup:
-# with psycopg.connect(DB_URI, autocommit=True) as conn:
-#     checkpointer = PostgresSaver(conn)
-#     checkpointer.setup()  # Call setup() on first run to initialize checkpoint tables
 
 # LLM
 llm = ChatGroq(
@@ -73,6 +59,7 @@ class TravelState(TypedDict):
     user_query: str 
     flight_results: str
     hotel_results: str
+    weather_results: str
     itinerary: str
     llm_calls: int
     
@@ -127,6 +114,36 @@ def hotel_agent(state: TravelState):
         ],
         "llm_calls": state.get("llm_calls", 0) + 1
     }
+ 
+ 
+# Weather Agent
+def weather_agent(state: TravelState):
+
+    city = extract_destination(state["user_query"])
+
+    weather_data = asyncio.run(
+        weather_mcp_search(city)
+    )
+
+    forecast_data = asyncio.run(
+        forecast_mcp_search(city)
+    )
+
+    return {
+        "weather_results": f"""
+        Current Weather:
+        {weather_data}
+
+        Forecast:
+        {forecast_data}
+        """,
+        "messages": [
+            AIMessage(
+                content="Weather information fetched"
+            )
+        ]
+    }
+
     
 # Itinerary Agent
 def itinerary_agent(state: TravelState):
@@ -142,6 +159,9 @@ def itinerary_agent(state: TravelState):
 
     Hotel Results:
     {state['hotel_results']}
+    
+    Weather Information:
+    {state['weather_results']}
     """
 
     # call the llm
