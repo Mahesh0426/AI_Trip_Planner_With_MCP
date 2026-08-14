@@ -1,4 +1,3 @@
-from streamlit.proto.NewSession_pb2 import Initialize
 import os
 import sys
 import asyncio
@@ -76,9 +75,9 @@ async def initialize_mcp():
 # get all the available tools
     tools = await client.get_tools()
 
-    # print("\nAvailable MCP Tools:")
-    # for tool in tools:
-    #     print(tool.name)
+    print("\nAvailable MCP Tools:")
+    for tool in tools:
+        print(tool.name)
         
     # Look all the tools and find the one whose name is tavily_search.
     search_tool = None
@@ -185,7 +184,6 @@ async def forecast_mcp_search(city: str):
         }
     )
 
-
 # LLM  - weather agent
 llm = ChatGroq(
     model="llama-3.3-70b-versatile"
@@ -209,5 +207,14 @@ def extract_destination(query: str):
 
     return response.content.strip()
 
+
+
+# testing all the available TOOLS
+async def print_all_tools():
+    tools = await client.get_tools()
+    print(f"\nFound {len(tools)} MCP Tools:\n")
+    for tool in tools:
+        print(f"- {tool.name}")
+       
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(print_all_tools())

@@ -12,7 +12,7 @@ from langchain_groq import ChatGroq
 # from tools.tavily_tool import tavily_search
 # from tools.flight_tool import search_flights
 from dotenv import load_dotenv
-from mcp_client import (tavily_mcp_server,aviation_mcp_calls,get_airports, get_airlines, freezw)
+from mcp_client import (tavily_mcp_server,aviation_mcp_calls,get_airports, get_airlines,)
 
 load_dotenv()
 
@@ -115,7 +115,6 @@ def hotel_agent(state: TravelState):
         "llm_calls": state.get("llm_calls", 0) + 1
     }
  
- 
 # Weather Agent
 def weather_agent(state: TravelState):
 
@@ -145,12 +144,14 @@ def weather_agent(state: TravelState):
     }
 
     
-# Itinerary Agent
+# Itinerary + Final Response Agent
 def itinerary_agent(state: TravelState):
 
-    # dynamic prompt to send to the llm
     prompt = f"""
-    Create a travel itinerary.
+    Create the final travel response for the user.
+
+    You are an expert travel planner.
+
     User Query:
     {state['user_query']}
 
@@ -159,49 +160,32 @@ def itinerary_agent(state: TravelState):
 
     Hotel Results:
     {state['hotel_results']}
-    
+
     Weather Information:
     {state['weather_results']}
+
+    Instructions:
+    - Create a practical travel itinerary based on the information above.
+    - Include the relevant flight information.
+    - Include the relevant hotel information.
+    - Use the weather information when planning the itinerary.
+    - Organize the response clearly by day.
+    - Include useful travel recommendations.
+    - Add relatable emojis where appropriate.
+    - Return a complete final response directly to the user.
     """
 
-    # call the llm
+    # Call the LLM
     response = llm.invoke([
         SystemMessage(
-            content="You are an expert travel planner"
+            content="You are an expert travel planner who creates clear and practical travel plans."
         ),
         HumanMessage(content=prompt)
     ])
 
-# update TravelState with below details
+    # Update TravelState
     return {
         "itinerary": response.content,
-        "messages": [response],
-        "llm_calls": state.get("llm_calls", 0) + 1
-    }
-
-# Final Response Agent
-def final_agent(state: TravelState):
-
-    # dynamic final prompt to send to the llm
-    final_prompt = f"""
-    Generate final travel response and aslo add relatable emoji.
-
-    Flights:
-    {state['flight_results']}
-
-    Hotels:
-    {state['hotel_results']}
-
-    Itinerary:
-    {state['itinerary']}
-    """
-
-#llm call
-    response = llm.invoke([
-        HumanMessage(content=final_prompt)
-    ])
-
-    return {
         "messages": [response],
         "llm_calls": state.get("llm_calls", 0) + 1
     }
@@ -212,15 +196,17 @@ g = StateGraph(TravelState)
 # add nodes
 g.add_node("flight_agent", flight_agent)
 g.add_node("hotel_agent", hotel_agent)
+g.add_node("weather_agent", weather_agent)
 g.add_node("itinerary_agent", itinerary_agent)
-g.add_node("final_agent", final_agent)
+
 
 # add edges
 g.add_edge(START , "flight_agent")
 g.add_edge("flight_agent", "hotel_agent")
-g.add_edge("hotel_agent", "itinerary_agent")
-g.add_edge("itinerary_agent", "final_agent")
-g.add_edge("final_agent", END)
+g.add_edge("hotel_agent", "weather_agent")
+g.add_edge("weather_agent", "itinerary_agent")
+g.add_edge("itinerary_agent", END)
+
 
 
 # Persistent connection so both CLI and Streamlit can share the compiled app
@@ -243,7 +229,7 @@ print("Graph saved successfully!")
 if __name__ == "__main__":
     config = {
         "configurable": {
-            "thread_id": "mahesh-2"  # Required for resuming state
+            "thread_id": "mahesh-3"  # Required for resuming state
         }
     }
 
@@ -273,21 +259,5 @@ if __name__ == "__main__":
     for msg in result["messages"]:
         print(msg.content)
 
-
-
-
-# query ="Create a five-day plan for Melbourne. I'm visiting Melbourne from Sydney."
-# result = g.invoke({
-#     'user_query': query,
-#     "flight_results" :"",
-#     "hotel_results":"",
-#     'itinerary':"",
-#     'messages':[],
-#     'llm_calls':0
-# })
-
-# print("\nQUERY:",query)
-# print("Final response:",result["messages"][-1].content)
-# print("Total LLM calls:", result["llm_calls"])
 
 
