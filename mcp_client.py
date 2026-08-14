@@ -1,5 +1,6 @@
 from streamlit.proto.NewSession_pb2 import Initialize
 import os
+import sys
 import asyncio
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
@@ -22,7 +23,7 @@ venv_python = os.path.abspath(
     )
 )
 
-# Create the MCP client for Tavily and AviationStack
+# Create the MCP client for Tavily , AviationStack and Weather
 client = MultiServerMCPClient(
     {
         "tavily":{
@@ -44,7 +45,7 @@ client = MultiServerMCPClient(
         },
          "weather": {
             "transport": "stdio",
-            "command": venv_python,
+            "command": sys.executable,
             "args": [
                 "-m",
                 "custom_weather_mcp_server",
@@ -57,32 +58,6 @@ client = MultiServerMCPClient(
         },
     }
 )
-
-# tool discovery  | testing mcp server
-async def main():
- 
-    tools = await client.get_tools()
-    
-    print("\nAvailable MCP tools:\n")
-    for tool in tools:
-            print(tool.name)
-           
-    # find the tavily_search tool from list of tools and break 
-    search_tool = None
-    for tool in tools:
-        if tool.name == "tavily_search":
-            search_tool = tool
-            break
-
-    # tool excution (tavily search tool call)
-    result = await search_tool.ainvoke({
-        "query": "Best hotel in sydney ?"
-    })
-    print("\nResult:", result)
-
-# if __name__ == "__main__":
-#     asyncio.run(main())
-
 
 # creating two variables for tavily_search tool and aviation tools
 search_tool = None 
@@ -219,7 +194,6 @@ llm = ChatGroq(
 # ###################################
 # Destination Extractor - to get city name for weather to fetch
 # ###################################
-
 def extract_destination(query: str):
 
     prompt = f"""

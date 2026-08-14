@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore")
+
 # pip install mcp requests
 
 from mcp.server.fastmcp import FastMCP
@@ -35,7 +38,6 @@ def get_current_weather(city: str):
         "wind_speed": data["wind"]["speed"]
     }
 
-
 @mcp.tool()
 def get_forecast(city:str):
     response = requests.get(
@@ -68,8 +70,6 @@ def get_forecast(city:str):
         "city": city,
         "forecast": forecast
     }
-
-
 
 if __name__ == "__main__":
     mcp.run()

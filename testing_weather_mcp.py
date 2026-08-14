@@ -1,21 +1,17 @@
+import warnings
+warnings.filterwarnings("ignore")
 import os
 from dotenv import load_dotenv
 import asyncio
-
 from langchain_mcp_adapters.client import MultiServerMCPClient
-#load_dotenv()
-load_dotenv(override=True)
 
+load_dotenv(override=True)
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-venv_python = os.path.abspath(
-    os.path.join(
-        os.path.dirname(__file__),
-        "aviationstack-mcp",
-        ".venv",
-        "Scripts" if os.name == "nt" else "bin",
-        "python.exe" if os.name == "nt" else "python"
-    )
-)
+
+import sys 
+# sys is a built-in Python module that gives you information and control over the Python runtime.
+
+venv_python = sys.executable
 
 client = MultiServerMCPClient(
     {
@@ -37,14 +33,26 @@ client = MultiServerMCPClient(
 
 async def main():
 
-    print("Loading tools...")
-
+    print("Loading Weather MCP tools...\n")
     tools = await client.get_tools()
+    print("Tools loaded successfully!")
 
-    print("Tools loaded!")
-
+    print("\nAvailable Tools:")
     for tool in tools:
-        print(tool.name)
+        print(f"- {tool.name}")
+        
+    # Find the weather tool
+    weather_tool = next(
+        tool for tool in tools
+        if tool.name == "get_current_weather"
+    )
+    # Call the MCP tool
+    result = await weather_tool.ainvoke(
+        {"city": "Sydney"}
+    )
+    print("\nSydney Weather:")
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
