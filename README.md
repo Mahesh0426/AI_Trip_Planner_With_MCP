@@ -81,7 +81,7 @@ Before running the application, ensure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Pradumnasaraf/AI-Trip-Planner-MCP.git
+git https://github.com/Mahesh0426/AI_Trip_Planner_With_MCP.git
 cd AI-Trip-Planner-MCP
 ```
 
