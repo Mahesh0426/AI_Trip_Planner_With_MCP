@@ -52,13 +52,13 @@ graph TD
 
 ## 🔌 MCP Tools Breakdown
 
-| Server | Transport | Tool Name | Description |
-| :--- | :--- | :--- | :--- |
-| **Tavily MCP** | `streamable_http` | `tavily_search` | Real-time web search for hotel listings and local attractions. |
-| **AviationStack MCP** | `stdio` | `list_airports` | Resolves departure/arrival airport codes and details. |
-| **AviationStack MCP** | `stdio` | `list_airlines` | Queries active airline carriers for flight route planning. |
-| **Custom Weather MCP** | `stdio` | `get_current_weather` | Retrieves live temperature, wind speed, and weather condition. |
-| **Custom Weather MCP** | `stdio` | `get_forecast` | Fetches 5-period weather forecast data for destination city. |
+| Server                 | Transport         | Tool Name             | Description                                                    |
+| :--------------------- | :---------------- | :-------------------- | :------------------------------------------------------------- |
+| **Tavily MCP**         | `streamable_http` | `tavily_search`       | Real-time web search for hotel listings and local attractions. |
+| **AviationStack MCP**  | `stdio`           | `list_airports`       | Resolves departure/arrival airport codes and details.          |
+| **AviationStack MCP**  | `stdio`           | `list_airlines`       | Queries active airline carriers for flight route planning.     |
+| **Custom Weather MCP** | `stdio`           | `get_current_weather` | Retrieves live temperature, wind speed, and weather condition. |
+| **Custom Weather MCP** | `stdio`           | `get_forecast`        | Fetches 5-period weather forecast data for destination city.   |
 
 ---
 
@@ -81,14 +81,35 @@ Before running the application, ensure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Pradumnasaraf/AI-Trip-Planner-MCP.git
-cd AI-Trip-Planner-MCP
+git clone https://github.com/Mahesh0426/AI_Trip_Planner_With_MCP.git
+cd AI_Trip_Planner_With_MCP
 ```
 
-> **Note**: Make sure to also clone or initialize the `aviationstack-mcp` repository inside the project folder:
+> **Note**: Make sure to also clone or initialize the `aviationstack-mcp` repository inside the AI_Trip_Planner_With_MCP folder for aviation stack mcp server:
+>
 > ```bash
 > git clone https://github.com/Pradumnasaraf/aviationstack-mcp.git
+>  cd aviationstack-mcp
 > ```
+
+####**Install UV**
+Check:
+
+```
+uv --version
+```
+
+**Install:**
+
+```
+pip install uv
+```
+
+**sync uv:**
+
+```uv sync
+
+```
 
 ### 2. Set Up Virtual Environment
 
@@ -171,7 +192,7 @@ python main.py
 
 1. You will be prompted: `Enter travel requests:`
 2. Enter your travel query, e.g.:
-   > *"Plan a 5-day trip to Tokyo from Sydney next month."*
+   > _"Plan a 5-day trip to Tokyo from Sydney next month."_
 3. The graph executes all agent nodes step-by-step:
    - Queries airport & airline lists via **AviationStack MCP**
    - Fetches hotel recommendations via **Tavily MCP**
@@ -186,6 +207,7 @@ python main.py
 You can test individual MCP servers using the included test scripts:
 
 - **Test Weather MCP Server**:
+
   ```bash
   python testing_weather_mcp.py
   ```
