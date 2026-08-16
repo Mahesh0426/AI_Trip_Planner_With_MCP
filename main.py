@@ -1,263 +1,90 @@
-from mcp_client import (forecast_mcp_search, weather_mcp_search, extract_destination)
-import os
-from typing import TypedDict, Annotated
-import operator
-import asyncio
+from langchain_core.messages import HumanMessage
+from langgraph.types import Command
 
-import psycopg
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.postgres import PostgresSaver
-from langchain_core.messages import ( AnyMessage,HumanMessage,AIMessage,SystemMessage)
-from langchain_groq import ChatGroq
-# from tools.tavily_tool import tavily_search
-# from tools.flight_tool import search_flights
-from dotenv import load_dotenv
-from mcp_client import (tavily_mcp_server,aviation_mcp_calls,get_airports, get_airlines,)
-
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/trip_planner")
-# Note: Make sure your Docker container is running (`docker compose up -d`) before connecting.
-
-# LLM
-llm = ChatGroq(
-    model="llama-3.3-70b-versatile"
-)
-
-# flight tool router prompt
-FLIGHT_AGENT_PROMPT="""
-You are an expert travel flight planner.
-Use the available MCP tools to find the best flights for the user's query.
-
-User Query:
-{query}
-
-Available Airport Information:
-{airport_data}
-
-Available Airlines Information:
-{airline_data}
-
-Generates:
-
-1.Likely Departure airport
-2.Likely Arrival airport
-3.Airlines serving this route 
-4.Typical flight durations 
-5.Estimated airfare range 
-6.Peak Season Pricing Warning 
-7.Best Time To Book
-8.booking advice
-
-Return concise travel guidance. 
-"""
-
-
-#TravelState is the shared storage that every node in your LangGraph can read from and write to
-class TravelState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]  # List of messages; operator.add combines new messages with existing messages.
-    user_query: str 
-    flight_results: str
-    hotel_results: str
-    weather_results: str
-    itinerary: str
-    llm_calls: int
-    
-    
-# Flight Agent
-def flight_agent(state: TravelState):
-    query = state["user_query"]
-    # flight_data = search_flights(query)
-
-    try:
-        airports_raw = asyncio.run(aviation_mcp_calls("list_airpots", {}))
-        airlines_raw = asyncio.run(aviation_mcp_calls("list_airlines", {}))
-        
-        prompt = FLIGHT_AGENT_PROMPT.format(
-            query=query,
-            airport_data=str(airports_raw)[:3000],
-            airline_data=str(airlines_raw)[:3000]
-        )
-        
-        response = llm.invoke([
-            SystemMessage(
-                content="You are an expert travel flight planner"
-            ),
-            HumanMessage(content=prompt)
-        ])
-        flight_data = response.content
-        
-    except Exception as e:
-        flight_data = f"Information on available:{str(e)} "
-        
-    return{
-        "flight_results": flight_data,
-        "messages": [
-            AIMessage(content="Flight recommendations generated")
-        ],
-        "llm_calls": state.get("llm_calls", 0) + 1
-    }
-    
-# Hotel Agent
-def hotel_agent(state: TravelState):
-    query = f"Best hotels for {state['user_query']}"
-    # hotel_results = tavily_search(query)
-    
-    # using from mcp
-    hotel_results = asyncio.run(tavily_mcp_server(query))
-
-    #update TravelState with below details
-    return {
-        "hotel_results": hotel_results,
-        "messages": [
-            AIMessage(content="Hotel information fetched")
-        ],
-        "llm_calls": state.get("llm_calls", 0) + 1
-    }
- 
-# Weather Agent
-def weather_agent(state: TravelState):
-
-    city = extract_destination(state["user_query"])
-
-    weather_data = asyncio.run(
-        weather_mcp_search(city)
-    )
-
-    forecast_data = asyncio.run(
-        forecast_mcp_search(city)
-    )
-
-    return {
-        "weather_results": f"""
-        Current Weather:
-        {weather_data}
-
-        Forecast:
-        {forecast_data}
-        """,
-        "messages": [
-            AIMessage(
-                content="Weather information fetched"
-            )
-        ]
-    }
-
-    
-# Itinerary + Final Response Agent
-def itinerary_agent(state: TravelState):
-
-    prompt = f"""
-    Create the final travel response for the user.
-
-    You are an expert travel planner.
-
-    User Query:
-    {state['user_query']}
-
-    Flight Results:
-    {state['flight_results']}
-
-    Hotel Results:
-    {state['hotel_results']}
-
-    Weather Information:
-    {state['weather_results']}
-
-    Instructions:
-    - Create a practical travel itinerary based on the information above.
-    - Include the relevant flight information.
-    - Include the relevant hotel information.
-    - Use the weather information when planning the itinerary.
-    - Organize the response clearly by day.
-    - Include useful travel recommendations.
-    - Add relatable emojis where appropriate.
-    - Return a complete final response directly to the user.
-    """
-
-    # Call the LLM
-    response = llm.invoke([
-        SystemMessage(
-            content="You are an expert travel planner who creates clear and practical travel plans."
-        ),
-        HumanMessage(content=prompt)
-    ])
-
-    # Update TravelState
-    return {
-        "itinerary": response.content,
-        "messages": [response],
-        "llm_calls": state.get("llm_calls", 0) + 1
-    }
-
-# Build the graph
-g = StateGraph(TravelState)
-
-# add nodes
-g.add_node("flight_agent", flight_agent)
-g.add_node("hotel_agent", hotel_agent)
-g.add_node("weather_agent", weather_agent)
-g.add_node("itinerary_agent", itinerary_agent)
-
-
-# add edges
-g.add_edge(START , "flight_agent")
-g.add_edge("flight_agent", "hotel_agent")
-g.add_edge("hotel_agent", "weather_agent")
-g.add_edge("weather_agent", "itinerary_agent")
-g.add_edge("itinerary_agent", END)
-
-
-
-# Persistent connection so both CLI and Streamlit can share the compiled app
-_conn = psycopg.connect(DATABASE_URL, autocommit=True)
-checkpointer = PostgresSaver(_conn)
-checkpointer.setup()
-
-# compile the graph
-app = g.compile(checkpointer=checkpointer)
-
-# save graph to file
-save_path = "graph.png"
-png_data = app.get_graph().draw_mermaid_png()
-with open(save_path, "wb") as f:
-    f.write(png_data)
-print("Graph saved successfully!")
-
+from trip_planner.graph import build_graph
 
 # run the graph
 if __name__ == "__main__":
+    app = build_graph()  # Build and compile the graph
+
     config = {
         "configurable": {
-            "thread_id": "mahesh-3"  # Required for resuming state
+            "thread_id": "mahesh-4"  # Required for resuming state
         }
     }
 
-    #every run fresh start
+    # every run fresh start
     # import uuid
     # config = {"configurable": {"thread_id": str(uuid.uuid4())}}
 
-    user_input = input("Enter travel requests:")
-    
-    # Invoke the multi-agent graph with initial state and session config for Postgres checkpoint persistence
+    user_input = input("Enter travel request: ").strip()
+
+    # Basic validation — reject shell commands or empty inputs
+    SHELL_KEYWORDS = ("source ", "export ", "cd ", "ls ", "echo ", "cat ", "python", "./", "activate")
+    if not user_input or len(user_input) < 10 or any(user_input.startswith(kw) for kw in SHELL_KEYWORDS):
+        print("\n❌ Invalid travel request. Please describe your trip (e.g. 'Plan a 5-day trip to Tokyo').")
+        exit(1)
+
+    print("\n⏳ Running agents... please wait...\n")
+
+    # ── PHASE 1: First invoke ──────────────────────────────────────────────────
+    # The graph will run all agents and then PAUSE at human_approval_agent's
+    # interrupt() call. State is saved to Postgres automatically.
     result = app.invoke(
         {
-            "messages": [
-                HumanMessage(content=user_input)
-            ],
+            "messages": [HumanMessage(content=user_input)],
             "user_query": user_input,
             "flight_results": "",
             "hotel_results": "",
             "itinerary": "",
-            "llm_calls": 0
+            "llm_calls": 0,
         },
-        config=config
+        config=config,
     )
 
-    print("\nFINAL RESPONSE:\n")
+    # Check if the graph paused at an interrupt (human approval needed)
+    # When interrupted, LangGraph adds an "__interrupt__" key to the result
+    if "__interrupt__" in result:
+        interrupt_payload = result["__interrupt__"][0].value
 
-    for msg in result["messages"]:
-        print(msg.content)
+        # Show the draft itinerary to the user
+        print("\n" + "=" * 60)
+        print("📋  DRAFT ITINERARY — PLEASE REVIEW")
+        print("=" * 60)
+        print(interrupt_payload.get("draft_itinerary", ""))
+        print("=" * 60 + "\n")
 
+        # ── PHASE 2: Ask for approval ──────────────────────────────────────────
+        approval = input("Do you approve this itinerary? (yes/no): ").strip().lower()
+        approved = approval in ("yes", "y")
 
+        feedback = ""
+        if not approved:
+            feedback = input(
+                "Please provide your feedback for revision: "
+            ).strip()
 
+        print("\n⏳ Generating final response...\n")
+
+        # Resume the graph by sending the human's decision back via Command
+        final_result = app.invoke(
+            Command(
+                resume={
+                    "approved": approved,
+                    "feedback": feedback,
+                }
+            ),
+            config=config,
+        )
+
+        print("\n" + "=" * 60)
+        print("✅  FINAL RESPONSE")
+        print("=" * 60)
+        for msg in final_result["messages"]:
+            print(msg.content)
+
+    else:
+        # Graph completed without interruption (shouldn't happen normally)
+        print("\nFINAL RESPONSE:\n")
+        for msg in result["messages"]:
+            print(msg.content)

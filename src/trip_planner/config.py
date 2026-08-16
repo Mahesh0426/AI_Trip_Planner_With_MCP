@@ -12,9 +12,5 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_llm():
     return ChatGroq(
-        model = os.getenv(
-            "GROQ_MODEL","llama-3.3-70b-versatile"
-            )
+        model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     )
-    
-    
