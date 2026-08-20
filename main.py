@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     config = {
         "configurable": {
-            "thread_id": "mahesh-4"  # Required for resuming state
+            "thread_id": "mahesh-5"  # Required for resuming state
         }
     }
 
@@ -36,6 +36,7 @@ if __name__ == "__main__":
             "user_query": user_input,
             "flight_results": "",
             "hotel_results": "",
+            "budget_results": "",
             "itinerary": "",
             "llm_calls": 0,
         },

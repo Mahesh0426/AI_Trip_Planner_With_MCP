@@ -33,15 +33,18 @@ ROUTE_MAP = {
     "itinerary_agent": "itinerary_agent",
 }
 
-# for select the agents according to 
+# selecting agents according to the user input
 def _selected_agents(state: TravelState) -> list[str]:
     selected = state.get("selected_agents")
     return [agent for agent in AGENT_ORDER if agent in selected]  
 
+# selecting first agent from the AGENT_ORDER
+# if no agent is selected, it will route to the itinerary agent
 def route_from_supervisor(state: TravelState) -> str:
     selected = _selected_agents(state)
     return selected[0] if selected else "itinerary_agent"
 
+# routing to the next agent in the AGENT_ORDER
 def route_after_agent(current_agent: str):
     def route(state: TravelState) -> str:
         selected = _selected_agents(state)
